@@ -231,7 +231,7 @@ def mostrar_ganador_final():
     pantalla.config(bg="#1a1a2e")
     pantalla.grab_set()
 
-    tk.Label(pantalla, text="⚡ RESULTADO FINAL ⚡",
+    tk.Label(pantalla, text=" RESULTADO FINAL ",
              font=("Arial", 22, "bold"), bg="#1a1a2e", fg="#e94560").pack(pady=20)
 
     frame = tk.Frame(pantalla, bg="#16213e", bd=2, relief="groove")
@@ -266,13 +266,13 @@ def mostrar_ganador_final():
 
     # Ganador
     if total_pc > total_maqueta:
-        msg = "🏆 ¡Gana el jugador PC!"
+        msg = "¡Gana el jugador PC!"
         color = "#00b894"
     elif total_maqueta > total_pc:
-        msg = "🏆 ¡Gana la maqueta!"
+        msg = "¡Gana la maqueta!"
         color = "#00b894"
     else:
-        msg = "🤝 ¡Empate total!"
+        msg = "¡Empate total!"
         color = "#fdcb6e"
 
     tk.Label(pantalla, text=msg, font=("Arial", 18, "bold"),
@@ -357,9 +357,9 @@ ventana.bind("<KeyPress-space>",   al_presionar)
 ventana.bind("<KeyRelease-space>", al_soltar)
 
 ruta_img_morse = "Imagenes\\morse.png"
-img_morse      = Image.open(ruta_img_morse)
-img_morse      = img_morse.resize((480, 400))
-img_morse_tk   = ImageTk.PhotoImage(img_morse)
+img_morse = Image.open(ruta_img_morse)
+img_morse = img_morse.resize((480, 400))
+img_morse_tk = ImageTk.PhotoImage(img_morse)
 tk.Label(ventana, image=img_morse_tk).place(x=250, y=350)
 
 ventana.mainloop()
