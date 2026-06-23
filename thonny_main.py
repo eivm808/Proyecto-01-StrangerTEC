@@ -92,6 +92,165 @@ frases = [
     ["C","O","D","I","G","O","M","O","R","S","E"]
 ]
 
+
+"""Se asocian las entradas a los pines de la RASP"""
+
+# Entradas al circuito incremento
+A = Pin(0, Pin.OUT)   # MSB
+B = Pin(1, Pin.OUT)
+C = Pin(20, Pin.OUT)
+D = Pin(21, Pin.OUT)  # LSB
+
+"""De la mismma manera se ingresa el nuevo modo para el SWITCH"""
+
+SW3=Pin(19, Pin.IN, Pin.PULL_UP)
+
+"""El boton, para que se ingresen los dos pares de letras."""
+
+BotonACSII=Pin(16, Pin.IN, Pin.PULL_UP)
+
+"""Diccionario ACSII A BINARIO. Se toma el nibble menos significativo y al final se debe truncar los mas significativos"""
+
+ACSII_a_letra = {
+    "01000001":"A", "01000010":"B", "01000011":"C", "01000100":"D",
+    "01000101":"E", "01000110":"F", "01000111":"G", "01001000":"H",
+    "01001001":"I", "01001010":"J", "01001011":"K", "01001100":"L",
+    "01001101":"M", "01001110":"N", "01001111":"O", "01010000":"P",
+    "01010001":"Q", "01010010":"R", "01010011":"S", "01010100":"T",
+    "01010101":"U", "01010110":"V", "01010111":"W", "01011000":"X",
+    "01011001":"Y", "01011010":"Z"
+}
+
+
+"""Aca se reutiliza el codigo para poder tomar la funcion que obtiene la letra que el usuario ingresa para poder proceder con el ajusto"""
+
+def codigo_ASCII():
+    # Obtener la letra ingresada en Morse
+    letra = obtener_letra_morse()
+    if letra is None:
+        return None
+    
+    # Convertir a ASCII
+    ascii_val = ord(letra)
+    
+    # Tomar los 4 bits menos significativos
+    lsb4 = ascii_val & 0b1111
+    
+    # Separar en bits A,B,C,D
+    bits = [(lsb4 >> 3) & 1, (lsb4 >> 2) & 1, (lsb4 >> 1) & 1, lsb4 & 1]
+    
+    print(f"Letra: {letra}, ASCII: {ascii_val}, Bits ABCD: {bits}")
+    
+    # Asignar a los pines físicos
+    A.value(bits[0])
+    B.value(bits[1])
+    C.value(bits[2])
+    D.value(bits[3])
+    
+    return bits
+
+# Ejemplo de uso
+while True:
+    if SW3.value() == 0:  # Switch activado
+        bits_in = codigo_ASCII()
+        if bits_in:
+            print("Bits enviados al circuito:", bits_in)
+    else:
+        time.sleep(0.5)
+# Reutilizamos el botón y diccionario de tus fuentes [3, 4]
+
+# ---- Funciones de Soporte ----
+
+def leer_boton():
+    """Devuelve True si el botón está presionado con debounce [4]."""
+    v1 = Boton.value()
+    time.sleep_ms(DEBOUNCE)
+    v2 = Boton.value()
+    if v1 == v2:
+        return v1 == 0  # PULL_UP: 0 es presionado
+    return False
+
+def leer_modo():
+    """Identifica el modo de juego según los switches [5]."""
+    if SW1.value() == 0: return "LOCAL"
+    if SW2.value() == 0: return "VERSUS"
+    return "NINGUNO"
+
+def actualizar_hardware_ascii(letra):
+    """Extrae 4 bits LSB del ASCII y los manda a los pines [6]."""
+    val_ascii = ord(letra)
+    # Extraer los 4 bits menos significativos (LSB)
+    bits = val_ascii & 0x0F 
+    
+    # Escribir en los pines físicos para el circuito de compuertas
+    pin_A.value((bits >> 3) & 1) # Bit 3 (MSB)
+    pin_B.value((bits >> 2) & 1) # Bit 2
+    pin_C.value((bits >> 1) & 1) # Bit 1
+    pin_D.value(bits & 1)        # Bit 0 (LSB) [7]
+    
+    print(f"Letra: {letra} | ASCII: {val_ascii} | LSB Enviado: {bin(bits)}")
+
+# ---- FUNCIÓN SOLICITADA: Obtener Letra Morse ----
+
+def obtener_letra_morse():
+    """
+    Lee pulsos del botón y traduce a letra cuando detecta una pausa larga.
+    """
+    codigo = ""
+    while True:
+        inicio_silencio = time.ticks_ms()
+        
+        # 1. Esperar a que el usuario presione el botón o se acabe el tiempo de la letra
+        while not leer_boton():
+            # Si el silencio supera la PAUSA_LETRA, la letra terminó [1]
+            if time.ticks_diff(time.ticks_ms(), inicio_silencio) > PAUSA_LETRA:
+                if codigo == "": 
+                    return None # No se ingresó nada
+                return morse_a_letra.get(codigo, "?")
+        
+        # 2. El botón fue presionado, medir duración del pulso
+        inicio_pulso = time.ticks_ms()
+        while leer_boton():
+            pass # Esperar a que suelte
+        
+        duracion = time.ticks_diff(time.ticks_ms(), inicio_pulso)
+        
+        # 3. Determinar si es punto o raya basado en TIEMPO_PUNTO [1]
+        if duracion > TIEMPO_PUNTO:
+            codigo += "-"
+        else:
+            codigo += "."
+        
+        # Feedback rápido para el usuario
+        print(f"Código actual: {codigo}")
+# ---- LOOP PRINCIPAL DE INTEGRACIÓN ----
+
+def ejecutar_maqueta():
+    print("Sistema StrangerTEC Listo.")
+    while True:
+        modo = leer_modo()
+        if modo == "NINGUNO":
+            # Apagar pines si no hay modo
+            pin_A.off(); pin_B.off(); pin_C.off(); pin_D.off()
+            continue
+
+        # El juego está activo, esperamos letras
+        letra_detectada = obtener_letra_morse()
+        
+        if letra_detectada:
+            # Requisito 1: Verificar el Switch de Activación (SW3) [2]
+            if SW3.value() == 0:
+                # Requisito 2 y 3: Procesar ASCII y enviar al circuito físico [6, 7]
+                actualizar_hardware_ascii(letra_detectada)
+            else:
+                # Si el switch está OFF, limpiar pines
+                pin_A.off(); pin_B.off(); pin_C.off(); pin_D.off()
+            
+            # Aquí enviarías la letra a la PC (VSCODE_MAIN_PC) por Serial
+            print(f"Resultado Final: {letra_detectada}")
+            
+            # Iniciar programa
+ejecutar_maqueta()
 # ---- Funciones LEDs ---------------------------------------------
 
 def EjecutarSecuencia(sec):
@@ -291,10 +450,13 @@ def leer_modo():
     """
     s1 = SW1.value()
     s2 = SW2.value()
+    s3 = SW3.value() # Debes leer el pin 19
     if s1 == 0 and s2 == 1:
         return "LOCAL"
     elif s1 == 1 and s2 == 0:
         return "VERSUS"
+    elif s3 == 1: # Si el SW3 está en ON (valor 0)
+        return "INCREMENTO_ACTIVO"
     else:
         return "NINGUNO"
 

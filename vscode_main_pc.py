@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 
 # ---- Serial ------------------------------------------------------
 
-ser = serial.Serial('COM4', 115200, timeout=1)
+ser = serial.Serial('COM7', 115200, timeout=1)
 
 # ---- Configuracion tiempo ----------------------------------------
 
